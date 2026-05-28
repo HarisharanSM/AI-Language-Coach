@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI German Voice Coach</title>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f4f7f6; margin: 0; padding: 40px; color: #333; }
+        .container { max-width: 800px; margin: 0 auto; background: white; padding: 30px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); }
+        h1 { color: #2c3e50; text-align: center; }
+        button { background: #3498db; color: white; border: none; padding: 12px 24px; font-size: 16px; border-radius: 6px; cursor: pointer; transition: background 0.2s; margin: 10px 5px; }
+        button:hover { background: #2980b9; }
+        button:disabled { background: #bdc3c7; cursor: not-allowed; }
+        #recordBtn { background: #e74c3c; }
+        #recordBtn:hover { background: #c0392b; }
+        #recordBtn.recording { background: #27ae60; animation: pulse 1.5s infinite; }
+        .script-box { background: #eef2f3; border-left: 5px solid #3498db; padding: 20px; border-radius: 6px; margin: 20px 0; min-height: 80px; }
+        .turn-indicator { font-weight: bold; text-transform: uppercase; color: #7f8c8d; font-size: 14px; margin-bottom: 5px; }
+        .english-line { font-size: 22px; color: #2c3e50; font-weight: 500; }
+        .live-log { background: #fdfefe; border: 1px solid #e2e8f0; height: 150px; overflow-y: auto; padding: 15px; border-radius: 6px; font-size: 14px; }
+        .feedback-box { margin-top: 30px; padding: 20px; border-top: 2px solid #e2e8f0; }
+        @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.6; } 100% { opacity: 1; } }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>🇩🇪 German Voice Coach</h1>
+    <p style="text-align: center; color: #666;">Practice speaking your lines based on the English prompts!</p>
+    
+    <div style="text-align: center;">
+        <button id="startSessionBtn">Generate New Scenario Script</button>
+        <button id="recordBtn" disabled>Hold to Speak German</button>
+    </div>
+
+    <div class="script-box">
+        <div class="turn-indicator">Your English Prompt:</div>
+        <div id="currentPrompt" class="english-line">Click "Generate New Scenario Script" to begin...</div>
+    </div>
+
+    <h3>Live Conversation Log</h3>
+    <div id="liveLog" class="live-log"></div>
+
+    <div id="feedbackContainer" class="feedback-box" style="display: none;">
+        <h2>Evaluation & Corrections</h2>
+        <div id="feedbackContent"></div>
+    </div>
+</div>
+
+<script>
+    let script = [];
+    let currentIdx = 0;
+    let mediaRecorder;
+    let audioChunks = [];
+
+    const startSessionBtn = document.getElementById('startSessionBtn');
+    const recordBtn = document.getElementById('recordBtn');
+    const currentPrompt = document.getElementById('currentPrompt');
+    const liveLog = document.getElementById('liveLog');
+    const feedbackContainer = document.getElementById('feedbackContainer');
+    const feedbackContent = document.getElementById('feedbackContent');
+
+    startSessionBtn.onclick = async () => {
+        currentPrompt.innerText = "Generating scenarios via Gemini...";
+        feedbackContainer.style.style = "none";
+        liveLog.innerHTML = "";
+        
+        const response = await fetch('/generate_script', { method: 'POST' });
+        const data = await response.json();
+        
+        script = data.script;
+        currentIdx = 0;
+        displayNextUserPrompt();
+        recordBtn.disabled = false;
+    };
+
+    function displayNextUserPrompt() {
+        if (currentIdx < script.length) {
+            // Find the next User turn
+            while (currentIdx < script.length && script[currentIdx].speaker !== 'User') {
+                currentIdx++;
+            }
+            if (currentIdx < script.length) {
+                currentPrompt.innerText = script[currentIdx].english;
+            } else {
+                finishRoleplay();
+            }
+        } else {
+            finishRoleplay();
+        }
+    }
+
+    // --- Audio Recording Logic ---
+    recordBtn.onmousedown = async () => {
+        audioChunks = [];
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        mediaRecorder = new MediaRecorder(stream);
+        
+        mediaRecorder.ondataavailable = e => audioChunks.push(e.data);
+        mediaRecorder.onstop = sendAudioToServer;
+        
+        mediaRecorder.start();
+        recordBtn.classList.add('recording');
+        recordBtn.innerText = "Listening... Release to Send";
+    };
+
+    recordBtn.onmouseup = () => {
+        if (mediaRecorder && mediaRecorder.state === "recording") {
+            mediaRecorder.stop();
+            recordBtn.classList.remove('recording');
+            recordBtn.innerText = "Hold to Speak German";
+        }
+    };
+
+    async function sendAudioToServer() {
+        currentPrompt.innerText = "Processing your German pronunciation...";
+        const audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
+        const formData = new FormData();
+        formData.append('audio', audioBlob);
+
+        const response = await fetch('/process_audio', { method: 'POST', body: formData });
+        const data = await response.json();
+
+        // Log what you said
+        liveLog.innerHTML += `<p><strong>You:</strong> ${data.user_transcription}</p>`;
+        
+        // If AI partner has a response line, play it out loud and log it
+        if (data.ai_response_german) {
+            liveLog.innerHTML += `<p style="color: #2980b9;"><strong>AI Partner:</strong> ${data.ai_response_german}</p>`;
+            speakGerman(data.ai_response_german);
+        }
+
+        liveLog.scrollTop = liveLog.scrollHeight;
+
+        if (data.is_finished) {
+            finishRoleplay();
+        } else {
+            currentIdx = data.next_turn_idx;
+            displayNextUserPrompt();
+        }
+    }
+
+    // Native Browser TTS (Text-to-Speech)
+    function speakGerman(text) {
+        const utterance = new SpeechSynthesisUtterance(text);
+        utterance.lang = 'de-DE';
+        window.speechSynthesis.speak(utterance);
+    }
+
+    async function finishRoleplay() {
+        currentPrompt.innerText = "Scene completed! Compiling Coach's notes...";
+        recordBtn.disabled = true;
+        
+        const response = await fetch('/get_feedback', { method: 'POST' });
+        const data = await response.json();
+        
+        feedbackContent.innerHTML = data.feedback_html;
+        feedbackContainer.style.display = "block";
+        currentPrompt.innerText = "Check your feedback report below!";
+    }
+</script>
+
+</body>
+</html>
