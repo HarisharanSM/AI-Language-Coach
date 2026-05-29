@@ -90,54 +90,78 @@
         }
     }
 
-    // --- Audio Recording Logic ---
-    recordBtn.onmousedown = async () => {
-        audioChunks = [];
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        mediaRecorder = new MediaRecorder(stream);
-        
-        mediaRecorder.ondataavailable = e => audioChunks.push(e.data);
-        mediaRecorder.onstop = sendAudioToServer;
-        
-        mediaRecorder.start();
-        recordBtn.classList.add('recording');
-        recordBtn.innerText = "Listening... Release to Send";
-    };
+    // ---  Audio Recording Logic ---
+    let isRecording = false;
 
-    recordBtn.onmouseup = () => {
-        if (mediaRecorder && mediaRecorder.state === "recording") {
+    // Modern web recording selector using robust MediaStream API structures
+    recordBtn.onclick = async () => {
+        if (!isRecording) {
+            audioChunks = [];
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                mediaRecorder = new MediaRecorder(stream);
+            
+                mediaRecorder.ondataavailable = (e) => {
+                    if (e.data.size > 0) audioChunks.push(e.data);
+                };
+            
+                mediaRecorder.onstop = sendAudioFileToServer;
+            
+                mediaRecorder.start();
+                isRecording = true;
+                recordBtn.classList.add('recording');
+                recordBtn.innerText = "Recording... Click to Stop & Send";
+                //currentPrompt.innerText = "Listening to your German pronunciation...";
+            } catch (err) {
+                console.error("Microphone hardware connection error:", err);
+                currentPrompt.innerText = "❌ Cannot access microphone. Check address bar permissions!";
+            }
+        } else {
             mediaRecorder.stop();
+            isRecording = false;
             recordBtn.classList.remove('recording');
-            recordBtn.innerText = "Hold to Speak German";
+            recordBtn.innerText = "Click to Speak German";
         }
     };
 
-    async function sendAudioToServer() {
-        currentPrompt.innerText = "Processing your German pronunciation...";
+    async function sendAudioFileToServer() {
+        currentPrompt.innerText = "Analyzing audio data on backend server...";
+    
         const audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
         const formData = new FormData();
-        formData.append('audio', audioBlob);
+        formData.append('audio', audioBlob, 'input.wav');
 
-        const response = await fetch('/process_audio', { method: 'POST', body: formData });
-        const data = await response.json();
+        try {
+            const response = await fetch('/process_audio', {
+                method: 'POST',
+                body: formData
+            });
+            const data = await response.json();
 
-        // Log what you said
-        liveLog.innerHTML += `<p><strong>You:</strong> ${data.user_transcription}</p>`;
-        
-        // If AI partner has a response line, play it out loud and log it
-        if (data.ai_response_german) {
-            liveLog.innerHTML += `<p style="color: #2980b9;"><strong>AI Partner:</strong> ${data.ai_response_german}</p>`;
-            speakGerman(data.ai_response_german);
-        }
+            // Update live logs seamlessly
+            liveLog.innerHTML += `<p><strong>You:</strong> ${data.user_transcription}</p>`;
+            if (data.ai_response_german) {
+                liveLog.innerHTML += `<p style="color: #2980b9;"><strong>AI Partner:</strong> ${data.ai_response_german}</p>`;
+                speakGerman(data.ai_response_german);
+            }
+            liveLog.scrollTop = liveLog.scrollHeight;
 
-        liveLog.scrollTop = liveLog.scrollHeight;
-
-        if (data.is_finished) {
-            finishRoleplay();
-        } else {
-            currentIdx = data.next_turn_idx;
+            if (data.is_finished) {
+                finishRoleplay();
+            } else {
+                currentIdx = data.next_turn_idx;
             displayNextUserPrompt();
+            }
+        } catch (err) {
+            console.error("Backend server connection failure:", err);
+            currentPrompt.innerText = "Error transmitting audio data to server.";
         }
+    }
+
+    function speakGerman(text) {
+        const utterance = new SpeechSynthesisUtterance(text);
+        utterance.lang = 'de-DE';
+        window.speechSynthesis.speak(utterance);
     }
 
     // Native Browser TTS (Text-to-Speech)
