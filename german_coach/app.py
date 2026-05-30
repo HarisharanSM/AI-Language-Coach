@@ -14,7 +14,7 @@ app = Flask(__name__)
 # Initialize the Gemini Client
 # Automatically picks up GEMINI_API_KEY environment variable
 client = genai.Client()
-MODEL_ID = 'gemini-2.5-flash'
+MODEL_ID = 'gemini-2.5-flash-lite'
 
 # In-memory storage for simplicity (Resets when server restarts)
 session_data = {
@@ -48,7 +48,7 @@ def generate_script():
     Create a realistic conversation scenario between a 'User' and an 'AI_Partner' tailored strictly for a GERMAN A1 BEGINNER.
     
     Topic Requirements:
-    - Choose an everyday, basic A1 situation (e.g., ordering a coffee, introducing oneself, asking for directions, or buying a bakery item).
+    - Choose an everyday, basic A1 situation (e.g., ordering a coffee, introducing oneself, asking for directions, buying a bakery item, asking for help in supermarket, interacting with people, ordering at restaturant, or similar situation).
     
     Language & Grammar Guidelines for A1:
     - Use only the simplest vocabulary (e.g., please, thank you, numbers, basic food items, everyday nouns).
