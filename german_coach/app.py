@@ -48,16 +48,16 @@ def generate_script():
     Create a realistic conversation scenario between a 'User' and an 'AI_Partner' tailored strictly for a GERMAN A1 BEGINNER.
     
     Topic Requirements:
-    - Choose an everyday, basic A1 situation (e.g., ordering a coffee, introducing oneself, asking for directions, buying a bakery item, asking for help in supermarket, interacting with people, ordering at restaturant, or similar situation).
+    - Choose a random everyday scenario, basic A1 situation (e.g., ordering a coffee, introducing oneself, asking for directions, buying a bakery item, asking for help in supermarket, interacting with people, ordering at restaturant, or similar situation).
     
     Language & Grammar Guidelines for A1:
     - Use only the simplest vocabulary (e.g., please, thank you, numbers, basic food items, everyday nouns).
-    - Sentences must be short and direct (maximum 5-7 words per line).
+    - Sentences must be short and direct (maximum 10-15 words per line).
     - Use ONLY Present Tense (Präsens). Do not use past tenses, subjunctive (Konjunktiv II like 'hätte gerne' should be avoided unless it's a basic fixed phrase like 'Ich möchte...'), or complex subordinate clauses with 'weil' or 'dass'.
     - Ensure the dialogue flows naturally but remains exceptionally easy to read and pronounce.
     
     Structure:
-    - Provide 8 to 12 alternating dialogue turns: User -> AI_Partner -> User -> AI_Partner.
+    - Provide 30 to 50 alternating dialogue turns: User -> AI_Partner -> User -> AI_Partner. should be a back-and-forth conversation of 5 - 10 minutes.
     """
     
     response = client.models.generate_content(
