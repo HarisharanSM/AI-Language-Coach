@@ -8,6 +8,7 @@ from typing import List
 import io
 import speech_recognition as sr
 from pydub import AudioSegment
+import random
 
 app = Flask(__name__)
 
@@ -21,6 +22,22 @@ session_data = {
     "script": [],
     "current_turn": 0,
     "actual_transcript": [] # Keeps track of what you and AI actually said out loud
+}
+
+# Mapping based on your completed VHS A1 Course modules
+VHS_A1_TOPICS = {
+    1: "Hallo! Wie geht's? (Greetings, introductions, basic well-being questions)",
+    2: "Meine Familie und ich (Talking about family members, relationships, and yourself)",
+    3: "Deutsch lernen (Discussing language learning, classroom items, basic study habits)",
+    4: "Essen und trinken (Buying groceries, ordering food, talking about meals/preferences)",
+    5: "Mein Tag (Daily routines, telling time, scheduling basic daily activities)",
+    6: "Meine Wohnung (Describing an apartment, rooms, furniture, and living spaces)",
+    7: "In der Stadt (Asking for directions, navigating public transport, locations in a city)",
+    8: "Arbeit und Beruf (Talking about jobs, professions, workplaces, and simple tasks)",
+    9: "Beim Arzt (Visiting the doctor, describing basic body parts, saying where it hurts)",
+    10: "Gestern und heute (Simple temporal comparisons, daily habits, current states)",
+    11: "Was ziehe ich an? (Talking about clothes, shopping for apparel, colors, and sizes)",
+    12: "Jahreszeiten und Wetter (Weather conditions, seasons, simple outdoor plans)"
 }
 
 @app.route('/')
@@ -42,22 +59,29 @@ class ScenarioScript(BaseModel):
 
 @app.route('/generate_script', methods=['POST'])
 def generate_script():
-    """Generates a complete multi-turn scenario dialogue script strictly tailored for German A1 learners"""
+    """Generates a complete multi-turn scenario dialogue script based on a random VHS A1 topic module"""
     
-    prompt = """
-    Create a realistic conversation scenario between a 'User' and an 'AI_Partner' tailored strictly for a GERMAN A1 BEGINNER.
+    # 1. Pick a random topic index between 1 and 12
+    random_topic_id = random.randint(1, 12)
+    chosen_topic_description = VHS_A1_TOPICS[random_topic_id]
     
-    Topic Requirements:
-    - Choose a random everyday scenario, basic A1 situation (e.g., ordering a coffee, introducing oneself, asking for directions, buying a bakery item, asking for help in supermarket, interacting with people, ordering at restaturant, or similar situation).
+    print(f"Selected Topic #{random_topic_id}: {chosen_topic_description}")
+    
+    # 2. Dynamic Prompt Injection
+    prompt = f"""
+    Create a highly realistic conversation scenario between a 'User' and an 'AI_Partner' tailored strictly for a GERMAN A1 BEGINNER.
+    
+    Mandatory Topic Framework:
+    - You MUST base this entire roleplay scenario on this specific theme: "Topic Module #{random_topic_id}: {chosen_topic_description}".
+    - Design a clear, practical real-world setting for this topic (e.g., if the topic is 'Beim Arzt', the scene is checking in at a clinic reception desk).
     
     Language & Grammar Guidelines for A1:
-    - Use only the simplest vocabulary (e.g., please, thank you, numbers, basic food items, everyday nouns).
-    - Sentences must be short and direct (maximum 10-15 words per line).
-    - Use ONLY Present Tense (Präsens). Do not use past tenses, subjunctive (Konjunktiv II like 'hätte gerne' should be avoided unless it's a basic fixed phrase like 'Ich möchte...'), or complex subordinate clauses with 'weil' or 'dass'.
-    - Ensure the dialogue flows naturally but remains exceptionally easy to read and pronounce.
+    - Use only the simplest vocabulary relevant to this specific topic framework.
+    - Sentences must be short, direct, and conversational (maximum 8-12 words per line).
+    - Use ONLY Present Tense (Präsens). Do not use past tenses, subjunctive forms (avoid 'hätte gerne'; use 'Ich möchte...' instead), or subordinate clauses with 'weil' or 'dass'.
     
     Structure:
-    - Provide 30 to 50 alternating dialogue turns: User -> AI_Partner -> User -> AI_Partner. should be a back-and-forth conversation of 5 - 10 minutes.
+    - Provide an extensive, alternating dialogue script containing between 12 to 16 total turns (User -> AI_Partner -> User -> AI_Partner). This ensures a thorough back-and-forth flow.
     """
     
     response = client.models.generate_content(
@@ -66,7 +90,7 @@ def generate_script():
         config=types.GenerateContentConfig(
             response_mime_type="application/json",
             response_schema=ScenarioScript,
-            temperature=0.5 # Lower temperature slightly to keep it strictly aligned with standard A1 conventions
+            temperature=0.6 # A bit of variance for fresh scenario generation
         )
     )
     
@@ -77,8 +101,12 @@ def generate_script():
     session_data["current_turn"] = 0
     session_data["actual_transcript"] = []
     
-    print(f"Generated an A1 script with {len(actual_turns)} dialogue lines.")
-    return jsonify({"status": "success", "script": actual_turns})
+    return jsonify({
+        "status": "success", 
+        "script": actual_turns,
+        "topic_id": random_topic_id,
+        "topic_name": chosen_topic_description.split(" (")[0] # Sends cleaner title to UI
+    })
 
 from pydub import AudioSegment
 import speech_recognition as sr
